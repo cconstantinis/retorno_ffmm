@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fondos Mutuos · Retorno vs Peers</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root {
+  --bg: #f6f5f0;
+  --card: #ffffff;
+  --border: #e2dfd6;
+  --text: #1c1b18;
+  --muted: #706e66;
+  --faint: #b0ada4;
+  --blue: #185FA5;
+  --green: #2a6b1a;
+  --red: #9b2222;
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'IBM Plex Sans', sans-serif;
+  --r: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141412; --card: #1e1d1a; --border: #2e2d28;
+    --text: #edecea; --muted: #8a8880; --faint: #4a4944;
+    --blue: #5b9fd4; --green: #5fad43; --red: #d46060;
+  }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--sans); background: var(--bg); color: var(--text); font-size: 14px; }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 0 20px 60px; }
+
+/* header */
+header { padding: 24px 0 16px; border-bottom: 1px solid var(--border); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 8px; }
+h1 { font-size: 16px; font-weight: 500; }
+.sub { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+
+/* controls */
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 12px; }
+.ctrl { display: flex; flex-direction: column; gap: 3px; }
+.ctrl label { font-size: 11px; font-family: var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+input[type=date], select {
+  font-family: var(--mono); font-size: 12px; padding: 6px 9px;
+  border: 1px solid var(--border); border-radius: var(--r);
+  background: var(--card); color: var(--text); outline: none;
+}
+input[type=date]:focus, select:focus { border-color: var(--blue); }
+.btn {
+  font-family: var(--mono); font-size: 12px; font-weight: 500;
+  padding: 6px 18px; border: 1px solid var(--blue); border-radius: var(--r);
+  background: var(--blue); color: #fff; cursor: pointer;
+}
+.btn:hover { opacity: .85; }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.pills { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+.pills span { font-size: 11px; color: var(--faint); font-family: var(--mono); }
+.pill { font-family: var(--mono); font-size: 11px; padding: 2px 10px; border: 1px solid var(--border); border-radius: 20px; background: var(--card); color: var(--muted); cursor: pointer; }
+.pill:hover { border-color: var(--blue); color: var(--blue); }
+.status { font-size: 11px; font-family: var(--mono); color: var(--muted); min-height: 20px; margin-bottom: 12px; }
+.spin { display: inline-block; width: 10px; height: 10px; border: 1.5px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; margin-right: 5px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* layout */
+.grid { display: grid; grid-template-columns: 1fr 320px; gap: 16px; align-items: start; }
+@media(max-width: 820px) { .grid { grid-template-columns: 1fr; } }
+
+/* table */
+.tcard { background: var(--card); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+.tscroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th { font-family: var(--mono); font-size: 10px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; padding: 7px 11px; border-bottom: 1px solid var(--border); background: var(--bg); white-space: nowrap; }
+th.r { text-align: right; }
+td { padding: 6px 11px; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+td.r { text-align: right; font-family: var(--mono); font-size: 12px; }
+tr:last-child td { border-bottom: none; }
+.sep td { background: var(--bg); font-size: 10px; font-family: var(--mono); font-weight: 500; color: var(--faint); letter-spacing: .08em; text-transform: uppercase; padding: 5px 11px; }
+.drow { cursor: pointer; transition: background .1s; }
+.drow:hover { background: var(--bg); }
+.drow.sel { background: color-mix(in srgb, var(--blue) 8%, transparent); }
+.cc { color: var(--blue); font-weight: 500; }
+.pos { color: var(--green); font-weight: 500; }
+.neg { color: var(--red); font-weight: 500; }
+.neu { color: var(--muted); }
+.r1 { font-family: var(--mono); font-size: 10px; padding: 1px 5px; border-radius: 3px; background: color-mix(in srgb,var(--green) 12%,transparent); color: var(--green); margin-left: 5px; }
+.rl { font-family: var(--mono); font-size: 10px; padding: 1px 5px; border-radius: 3px; background: color-mix(in srgb,var(--red) 12%,transparent); color: var(--red); margin-left: 5px; }
+
+/* sidebar */
+.sidebar { display: flex; flex-direction: column; gap: 14px; }
+.scard { background: var(--card); border: 1px solid var(--border); border-radius: var(--r); padding: 14px; }
+.stitle { font-family: var(--mono); font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 10px; }
+.hint { font-family: var(--mono); font-size: 11px; color: var(--faint); text-align: center; padding: 30px 0; }
+.chart-box { position: relative; height: 200px; }
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.stat { display: flex; flex-direction: column; gap: 2px; }
+.slabel { font-size: 10px; font-family: var(--mono); color: var(--faint); }
+.sval { font-size: 17px; font-family: var(--mono); }
+
+/* empty */
+.empty { text-align: center; padding: 50px 20px; color: var(--muted); font-family: var(--mono); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div>
+    <h1>Fondos Mutuos · Retorno vs Peers</h1>
+    <div class="sub">Credicorp Capital · Renta Fija · Fuente: SMV</div>
+  </div>
+  <div class="sub" id="last-update">—</div>
+</header>
+
+<div class="controls">
+  <div class="ctrl">
+    <label>Inicio</label>
+    <input type="date" id="d0" value="2025-12-31">
+  </div>
+  <div class="ctrl">
+    <label>Fin</label>
+    <input type="date" id="d1">
+  </div>
+  <div class="ctrl">
+    <label>Tipo</label>
+    <select id="modo">
+      <option value="bruta">Retorno bruto</option>
+      <option value="neta">Retorno neto</option>
+    </select>
+  </div>
+  <button class="btn" id="btnCalc" onclick="calcular()">Calcular</button>
+</div>
+
+<div class="pills">
+  <span>Acceso rápido:</span>
+  <button class="pill" onclick="rango('ytd')">YTD</button>
+  <button class="pill" onclick="rango('mtd')">MTD</button>
+  <button class="pill" onclick="rango(7)">7d</button>
+  <button class="pill" onclick="rango(30)">30d</button>
+  <button class="pill" onclick="rango(90)">90d</button>
+</div>
+
+<div class="status" id="status"></div>
+
+<div id="content">
+  <div class="empty">Selecciona un período y presiona Calcular.</div>
+</div>
+
+</div>
+
+<script>
+// ── CONFIGURA TU WORKER AQUÍ ─────────────────────────────────────
+const WORKER = "https://smv-fondos.carloconstantini1.workers.dev";
+// ─────────────────────────────────────────────────────────────────
+
+const CATS = {
+  "Corto Plazo Soles": [
+    "CRED. CONSER. CORTO PLAZO S/ CREDICORP SAF",
+    "BBVA RENTA CORTO PLAZO S/. BBVA SAF",
+    "FONDOS SURA SAF-SURA CORTO PLAZO SOLES  SERIE B",
+    "INTERFONDO-IF OPORTUNIDAD SOLES  SERIE A",
+    "SF Corto Plazo Plus S/ SCOTIA FONDOS",
+  ],
+  "Mediano Plazo Soles": [
+    "CC CONSERV. MED. PLAZO S/. CREDICORP SAF",
+    "BBVA RENTA MED. PLAZO S/. BBVA SAF",
+    "FONDOS SURA SAF-SURA RENTA SOLES  SERIE B",
+    "IF MEDIANO PLAZO SOLES INTERFONDO",
+    "SF MEDIANO PLAZO FLEX S/ SCOTIA FONDOS",
+  ],
+  "Corto Plazo Dólares": [
+    "BBVA RENTA CORTO PLAZO $ BBVA SAF",
+    "CRED. CONSER. CORTO PLAZO $ CREDICORP SAF",
+    "FONDOS SURA SAF-SURA CORTO PLAZO DOLARES  SERIE B",
+    "INTERFONDO-IF OPORTUNIDAD  SERIE A",
+    "SF Corto Plazo Plus $ SCOTIA FONDOS",
+  ],
+  "Mediano Plazo Dólares": [
+    "BBVA RENTA MED. PLAZO $ BBVA SAF",
+    "CREDICORP CONSER. MED. PLA. $ CREDICORP SAF",
+    "IF MEDIANO PLAZO INTERFONDO",
+    "FONDOS SURA SAF-FdF SURA RENTA DOLARES  SERIE B",
+    "SF MEDIANO PLAZO FLEX $ SCOTIA FONDOS",
+  ],
+  "Liquidez Soles": [
+    "CRED. CONSERVAD. LIQUIDEZ S/ CREDICORP SAF",
+    "BBVA CASH SOLES BBVA SAF",
+    "FONDOS SURA SAF-SURA ULTRA CASH SOLES  SERIE B",
+    "SF Liquidez S/. SCOTIA FONDOS",
+    "INTERFONDO-IF LIBRE DISPONIBILIDAD S/.  SERIE A",
+  ],
+  "Liquidez Dólares": [
+    "CRED. CONSERVADOR LIQUIDEZ $ CREDICORP SAF",
+    "BBVA CASH DOLARES BBVA SAF",
+    "FONDOS SURA SAF-SURA ULTRA CASH DOLARES  SERIE B",
+    "SF LIQUIDEZ $ SCOTIA FONDOS",
+    "INTERFONDO-IF LIBRE DISPONIBILIDAD  SERIE A",
+  ],
+  "Deuda Corp Soles": [
+    "CC DEUDA CORPORATIVA SOLES CREDICORP SAF",
+    "SURA DEUDA SOBER. DISTRIB. S/ FONDOS SURA SAF",
+  ],
+};
+
+const COM_BASE = {
+  "CRED. CONSER. CORTO PLAZO S/ CREDICORP SAF": 103.3,
+  "BBVA RENTA CORTO PLAZO S/. BBVA SAF": 70.8,
+  "INTERFONDO-IF OPORTUNIDAD SOLES  SERIE A": 129,
+  "SF Corto Plazo Plus S/ SCOTIA FONDOS": 106,
+  "FONDOS SURA SAF-SURA CORTO PLAZO SOLES  SERIE B": 82.60,
+  "CRED. CONSER. CORTO PLAZO $ CREDICORP SAF": 64.9,
+  "BBVA RENTA CORTO PLAZO $ BBVA SAF": 70.8,
+  "INTERFONDO-IF OPORTUNIDAD  SERIE A": 100.30,
+  "FONDOS SURA SAF-SURA CORTO PLAZO DOLARES  SERIE B": 82.60,
+  "SF Corto Plazo Plus $ SCOTIA FONDOS": 106.20,
+  "CRED. CONSERVAD. LIQUIDEZ S/ CREDICORP SAF": 67.19,
+  "BBVA CASH SOLES BBVA SAF": 59.0,
+  "FONDOS SURA SAF-SURA ULTRA CASH SOLES  SERIE B": 47.2,
+  "SF Liquidez S/. SCOTIA FONDOS": 85.03,
+  "CRED. CONSERVADOR LIQUIDEZ $ CREDICORP SAF": 74.27,
+  "BBVA CASH DOLARES BBVA SAF": 53.1,
+  "FONDOS SURA SAF-SURA ULTRA CASH DOLARES  SERIE B": 47.2,
+  "SF LIQUIDEZ $ SCOTIA FONDOS": 90.93,
+  "CC CONSERV. MED. PLAZO S/. CREDICORP SAF": 159.3,
+  "BBVA RENTA MED. PLAZO S/. BBVA SAF": 88.50,
+  "IF MEDIANO PLAZO SOLES INTERFONDO": 159.3,
+  "FONDOS SURA SAF-SURA RENTA SOLES  SERIE B": 135.7,
+  "SF MEDIANO PLAZO FLEX S/ SCOTIA FONDOS": 118,
+  "CREDICORP CONSER. MED. PLA. $ CREDICORP SAF": 159.3,
+  "BBVA RENTA MED. PLAZO $ BBVA SAF": 76.7,
+  "FONDOS SURA SAF-FdF SURA RENTA DOLARES  SERIE B": 100.3,
+  "IF MEDIANO PLAZO INTERFONDO": 159.3,
+  "SF MEDIANO PLAZO FLEX $ SCOTIA FONDOS": 118,
+  "CC DEUDA CORPORATIVA SOLES CREDICORP SAF": 99.9,
+  "INTERFONDO-IF LIBRE DISPONIBILIDAD S/.  SERIE A": 100.3,
+  "INTERFONDO-IF LIBRE DISPONIBILIDAD  SERIE A": 73.16,
+  "SURA DEUDA SOBER. DISTRIB. S/ FONDOS SURA SAF": 100,
+};
+
+const COM_CAMBIOS = [
+  ["BBVA CASH DOLARES BBVA SAF","2025-02-15",59.0],
+  ["BBVA CASH DOLARES BBVA SAF","2025-11-01",63.7],
+  ["BBVA CASH SOLES BBVA SAF","2025-02-15",70.8],
+  ["BBVA CASH SOLES BBVA SAF","2025-11-01",76.7],
+  ["BBVA RENTA CORTO PLAZO $ BBVA SAF","2025-02-15",70.8],
+  ["BBVA RENTA CORTO PLAZO $ BBVA SAF","2025-11-01",82.6],
+  ["BBVA RENTA CORTO PLAZO S/. BBVA SAF","2025-02-15",82.6],
+  ["BBVA RENTA CORTO PLAZO S/. BBVA SAF","2025-11-01",94.4],
+  ["BBVA RENTA MED. PLAZO $ BBVA SAF","2025-02-15",88.5],
+  ["BBVA RENTA MED. PLAZO $ BBVA SAF","2025-11-01",106.2],
+  ["BBVA RENTA MED. PLAZO S/. BBVA SAF","2025-02-15",94.4],
+  ["BBVA RENTA MED. PLAZO S/. BBVA SAF","2025-11-01",118.0],
+  ["CRED. CONSER. CORTO PLAZO S/ CREDICORP SAF","2025-03-04",116.9],
+  ["CRED. CONSER. CORTO PLAZO S/ CREDICORP SAF","2025-07-15",127.5],
+  ["CRED. CONSER. CORTO PLAZO $ CREDICORP SAF","2025-03-04",79.1],
+  ["CRED. CONSER. CORTO PLAZO $ CREDICORP SAF","2025-07-15",89.7],
+  ["CREDICORP CONSER. MED. PLA. $ CREDICORP SAF","2025-03-04",165.2],
+  ["CC CONSERV. MED. PLAZO S/. CREDICORP SAF","2025-03-04",165.2],
+  ["CRED. CONSERVADOR LIQUIDEZ $ CREDICORP SAF","2025-07-15",71.91],
+  ["CRED. CONSERVAD. LIQUIDEZ S/ CREDICORP SAF","2025-07-15",114.39],
+];
+
+// ── Estado global ─────────────────────────────────────────────────
+let historico = {};   // { "YYYY-MM-DD": { fondo: valor, ... } }
+let rows = [];
+let selFondo = null;
+let chart = null;
+
+// ── Utilidades fecha ──────────────────────────────────────────────
+const hoy = () => {
+  const d = new Date();
+  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+};
+
+document.getElementById("d1").value = hoy();
+
+function rango(tipo) {
+  const fin = new Date(hoy());
+  let ini = new Date(fin);
+  if (tipo === "ytd") { ini = new Date(fin.getFullYear() - 1, 11, 31); }
+  else if (tipo === "mtd") { ini = new Date(fin.getFullYear(), fin.getMonth(), 0); }
+  else { ini.setDate(ini.getDate() - tipo); }
+  document.getElementById("d0").value = ini.toISOString().slice(0, 10);
+  document.getElementById("d1").value = fin.toISOString().slice(0, 10);
+}
+
+// ── Comisiones ────────────────────────────────────────────────────
+function comVigente(fondo, fecha) {
+  let c = COM_BASE[fondo] || 0;
+  COM_CAMBIOS
+    .filter(x => x[0] === fondo && new Date(x[1]) <= fecha)
+    .sort((a, b) => new Date(a[1]) - new Date(b[1]))
+    .forEach(x => { c = x[2]; });
+  return c;
+}
+
+function ajuste(fondo, ini, fin) {
+  const cortes = [new Date(ini)];
+  COM_CAMBIOS.filter(x => x[0] === fondo).forEach(x => {
+    const d = new Date(x[1]);
+    if (d > ini && d < fin) cortes.push(d);
+  });
+  cortes.push(new Date(fin));
+  cortes.sort((a, b) => a - b);
+  let bps = 0;
+  for (let i = 0; i < cortes.length - 1; i++) {
+    const dias = (cortes[i + 1] - cortes[i]) / 86400000;
+    bps += (comVigente(fondo, cortes[i]) / 360) * dias;
+  }
+  return bps;
+}
+
+// ── Fetch con KV ─────────────────────────────────────────────────
+function toSMV(iso) { const [y,m,d] = iso.split("-"); return `${d}/${m}/${y}`; }
+
+async function getFecha(iso) {
+  if (historico[iso] && Object.keys(historico[iso]).length > 0) return historico[iso];
+  st(`<span class="spin"></span>Consultando SMV: ${iso}…`);
+  const res = await fetch(`${WORKER}/?fecha=${encodeURIComponent(toSMV(iso))}`);
+  const data = await res.json();
+  if (data.fondos && Object.keys(data.fondos).length > 0) {
+    historico[iso] = data.fondos;
+  }
+  return data.fondos || {};
+}
+
+async function cargarHistorico() {
+  try {
+    const res = await fetch(`${WORKER}/historico`);
+    const data = await res.json();
+    if (data.fechas) {
+      historico = { ...historico, ...data.fechas };
+      const n = Object.keys(data.fechas).length;
+      document.getElementById("last-update").textContent = `${n} fechas en KV`;
+    }
+  } catch(e) { /* silencioso */ }
+}
+
+// ── Cálculo principal ─────────────────────────────────────────────
+async function calcular() {
+  const iso0 = document.getElementById("d0").value;
+  const iso1 = document.getElementById("d1").value;
+  if (!iso0 || !iso1 || iso0 >= iso1) { st("⚠ Rango inválido."); return; }
+
+  document.getElementById("btnCalc").disabled = true;
+  document.getElementById("content").innerHTML = "";
+  selFondo = null;
+
+  const vc0 = await getFecha(iso0);
+  const vc1 = await getFecha(iso1);
+
+  const d0 = new Date(iso0), d1 = new Date(iso1);
+  rows = [];
+  for (const [cat, fondos] of Object.entries(CATS)) {
+    for (const f of fondos) {
+      const v0 = vc0[f] || null, v1 = vc1[f] || null;
+      let neto = null, bruto = null;
+      if (v0 && v1) {
+        neto  = (v1 / v0 - 1) * 10000;
+        bruto = neto + ajuste(f, d0, d1);
+      }
+      rows.push({ cat, f, v0, v1, neto, bruto });
+    }
+  }
+
+  const fmtD = iso => new Date(iso).toLocaleDateString("es-PE", { day:"2-digit", month:"short", year:"numeric" });
+  const dias = Math.round((d1 - d0) / 86400000);
+  st(`${fmtD(iso0)} → ${fmtD(iso1)} · ${dias} días`);
+  renderGrid();
+  document.getElementById("btnCalc").disabled = false;
+}
+
+// ── Render ────────────────────────────────────────────────────────
+function renderGrid() {
+  const modo = document.getElementById("modo").value;
+  const iso0 = document.getElementById("d0").value;
+  const iso1 = document.getElementById("d1").value;
+
+  // Rankings por categoría
+  const rank = {};
+  for (const [cat, fondos] of Object.entries(CATS)) {
+    const vals = rows.filter(r => r.cat === cat && r[modo] !== null)
+                     .sort((a,b) => b[modo] - a[modo]);
+    if (vals.length) {
+      rank[vals[0].f] = "top";
+      rank[vals[vals.length-1].f] = "bot";
+    }
+  }
+
+  let tbl = `<table>
+    <thead><tr>
+      <th>Fondo</th>
+      <th class="r">VC ${iso0.slice(5)}</th>
+      <th class="r">VC ${iso1.slice(5)}</th>
+      <th class="r">Retorno (bps)</th>
+    </tr></thead><tbody>`;
+
+  let lastCat = null;
+  for (const r of rows) {
+    if (r.cat !== lastCat) {
+      tbl += `<tr class="sep"><td colspan="4">${r.cat}</td></tr>`;
+      lastCat = r.cat;
+    }
+    const v = r[modo];
+    const cls = v === null ? 'neu' : v >= 0 ? 'pos' : 'neg';
+    const bps = v === null ? '<span class="neu">—</span>'
+              : `<span class="${cls}">${v >= 0 ? '+' : ''}${v.toFixed(1)}</span>`;
+    const badge = rank[r.f] === 'top' ? '<span class="r1">↑</span>'
+                : rank[r.f] === 'bot' ? '<span class="rl">↓</span>' : '';
+    const icc = /CREDICORP|^CC |^CRED\./i.test(r.f) ? ' cc' : '';
+    const sel = selFondo === r.f ? ' sel' : '';
+    tbl += `<tr class="drow${sel}" onclick="verFondo(${JSON.stringify(r.f)})">
+      <td><span class="${icc.trim()}">${r.f}${badge}</span></td>
+      <td class="r neu" style="font-size:11px">${r.v0 ? r.v0.toFixed(6) : '—'}</td>
+      <td class="r neu" style="font-size:11px">${r.v1 ? r.v1.toFixed(6) : '—'}</td>
+      <td class="r">${bps}</td>
+    </tr>`;
+  }
+  tbl += '</tbody></table>';
+
+  document.getElementById("content").innerHTML = `
+    <div class="grid">
+      <div class="tcard"><div class="tscroll">${tbl}</div></div>
+      <div class="sidebar">
+        <div class="scard" id="sc-chart">
+          <div class="stitle">Serie de tiempo</div>
+          <div class="hint" id="sc-hint">← Haz clic en un fondo</div>
+          <div class="chart-box" id="sc-box" style="display:none">
+            <canvas id="ts-canvas" role="img" aria-label="Evolución del valor cuota indexado"></canvas>
+          </div>
+        </div>
+        <div class="scard" id="sc-stats" style="display:none">
+          <div class="stitle" id="sc-name">—</div>
+          <div class="stats" id="sc-vals"></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function verFondo(fondo) {
+  selFondo = fondo;
+  document.querySelectorAll(".drow").forEach(tr => {
+    const txt = tr.querySelector("span")?.textContent || "";
+    tr.classList.toggle("sel", txt.startsWith(fondo));
+  });
+
+  const iso0 = document.getElementById("d0").value;
+  const iso1 = document.getElementById("d1").value;
+
+  // Fechas disponibles en el rango
+  const fechas = Object.keys(historico).filter(d => d >= iso0 && d <= iso1).sort();
+  if (fechas.length < 2) {
+    document.getElementById("sc-hint").textContent = "Sin suficiente histórico en KV para este período.";
+    return;
+  }
+
+  const vcBase = historico[fechas[0]]?.[fondo];
+  if (!vcBase) {
+    document.getElementById("sc-hint").textContent = "Sin datos para este fondo.";
+    return;
+  }
+
+  const labels = [], vals = [];
+  for (const d of fechas) {
+    const vc = historico[d]?.[fondo];
+    if (vc) { labels.push(d.slice(5)); vals.push(+((vc / vcBase - 1) * 10000).toFixed(2)); }
+  }
+
+  document.getElementById("sc-hint").style.display = "none";
+  const box = document.getElementById("sc-box");
+  box.style.display = "block";
+
+  if (chart) { chart.destroy(); chart = null; }
+  const dark = matchMedia("(prefers-color-scheme:dark)").matches;
+  const icc = /CREDICORP|^CC |^CRED\./i.test(fondo);
+  const color = icc ? "#185FA5" : "#888780";
+  const gridC = dark ? "#2e2d28" : "#e2dfd6";
+  const tickC = dark ? "#4a4944" : "#b0ada4";
+
+  chart = new Chart(document.getElementById("ts-canvas"), {
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        data: vals,
+        borderColor: color,
+        backgroundColor: color + "14",
+        fill: true,
+        tension: 0.35,
+        pointRadius: labels.length > 60 ? 0 : 2,
+        borderWidth: 1.5,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => ` ${+c.raw >= 0 ? "+" : ""}${(+c.raw).toFixed(1)} bps` } }
+      },
+      scales: {
+        x: { ticks: { color: tickC, font: { family: "'IBM Plex Mono'", size: 10 }, maxTicksLimit: 7, autoSkip: true }, grid: { color: gridC } },
+        y: { ticks: { color: tickC, font: { family: "'IBM Plex Mono'", size: 10 }, callback: v => (v >= 0 ? "+" : "") + v.toFixed(0) }, grid: { color: gridC } }
+      }
+    }
+  });
+
+  // Stats card
+  const r = rows.find(x => x.f === fondo);
+  const ret = vals[vals.length - 1];
+  const mx = Math.max(...vals), mn = Math.min(...vals);
+  const com = comVigente(fondo, new Date(iso1)).toFixed(1);
+  document.getElementById("sc-stats").style.display = "block";
+  document.getElementById("sc-name").textContent = fondo.split(" ").slice(-2).join(" ");
+  document.getElementById("sc-vals").innerHTML = `
+    <div class="stat"><div class="slabel">Retorno período</div>
+      <div class="sval ${ret >= 0 ? 'pos' : 'neg'}">${ret >= 0 ? "+" : ""}${ret.toFixed(1)}<span style="font-size:11px;color:var(--muted)"> bps</span></div></div>
+    <div class="stat"><div class="slabel">Comisión vigente</div>
+      <div class="sval">${com}<span style="font-size:11px;color:var(--muted)"> bps</span></div></div>
+    <div class="stat"><div class="slabel">Máx. del período</div>
+      <div class="sval pos">+${mx.toFixed(1)}</div></div>
+    <div class="stat"><div class="slabel">Mín. del período</div>
+      <div class="sval ${mn >= 0 ? 'pos' : 'neg'}">${mn >= 0 ? "+" : ""}${mn.toFixed(1)}</div></div>`;
+}
+
+function st(msg) { document.getElementById("status").innerHTML = msg; }
+
+// Cambio de modo rellena tabla sin re-fetchar
+document.getElementById("modo").addEventListener("change", () => {
+  if (rows.length) renderGrid();
+});
+
+// Al cargar: traer histórico del KV silenciosamente
+cargarHistorico();
+</script>
+</body>
+</html>
