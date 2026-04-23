@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fondos Mutuos · Retorno vs Peers</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root {
+  --bg:#f6f5f0;--card:#fff;--border:#e2dfd6;
+  --text:#1c1b18;--muted:#706e66;--faint:#b8b5ac;
+  --blue:#185FA5;--green:#2a6b1a;--red:#9b2222;
+  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;--r:6px;
+}
+@media(prefers-color-scheme:dark){
+  :root{--bg:#141412;--card:#1e1d1a;--border:#2e2d28;--text:#edecea;--muted:#8a8880;--faint:#4a4944;--blue:#5b9fd4;--green:#5fad43;--red:#d46060;}
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:14px;}
+.wrap{max-width:1100px;margin:0 auto;padding:0 20px 60px;}
+
+header{padding:24px 0 16px;border-bottom:1px solid var(--border);margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:8px;}
+h1{font-size:16px;font-weight:500;}
+.sub{font-size:12px;color:var(--muted);font-family:var(--mono);}
+
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:10px;}
+.ctrl{display:flex;flex-direction:column;gap:3px;}
+.ctrl label{font-size:11px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;}
+input[type=date]{font-family:var(--mono);font-size:12px;padding:6px 9px;border:1px solid var(--border);border-radius:var(--r);background:var(--card);color:var(--text);outline:none;}
+input[type=date]:focus{border-color:var(--blue);}
+.btn{font-family:var(--mono);font-size:12px;font-weight:500;padding:6px 18px;border:1px solid var(--blue);border-radius:var(--r);background:var(--blue);color:#fff;cursor:pointer;}
+.btn:hover{opacity:.85;}.btn:disabled{opacity:.4;cursor:not-allowed;}
+.pills{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:16px;}
+.pills span{font-size:11px;color:var(--faint);font-family:var(--mono);}
+.pill{font-family:var(--mono);font-size:11px;padding:2px 10px;border:1px solid var(--border);border-radius:20px;background:var(--card);color:var(--muted);cursor:pointer;transition:all .12s;}
+.pill:hover{border-color:var(--blue);color:var(--blue);}
+.status{font-size:11px;font-family:var(--mono);color:var(--muted);min-height:20px;margin-bottom:14px;}
+.spin{display:inline-block;width:10px;height:10px;border:1.5px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:5px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* PERFORMANCE TABLE */
+.perf-block{margin-bottom:28px;}
+.block-title{font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:8px 0 6px;border-bottom:2px solid var(--border);margin-bottom:0;}
+.tcard{background:var(--card);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--r) var(--r);overflow:hidden;}
+.tscroll{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;}
+th{font-family:var(--mono);font-size:10px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;padding:7px 10px;border-bottom:1px solid var(--border);background:var(--bg);white-space:nowrap;text-align:right;}
+th.l{text-align:left;}
+td{padding:5px 10px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:12px;text-align:right;white-space:nowrap;}
+td.fname{text-align:left;font-family:var(--sans);font-size:12px;max-width:320px;}
+td.cat{text-align:left;font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);background:var(--bg);padding:5px 10px;}
+tr:last-child td{border-bottom:none;}
+.drow{cursor:pointer;transition:background .1s;}
+.drow:hover{background:color-mix(in srgb,var(--blue) 4%,transparent);}
+.drow.sel{background:color-mix(in srgb,var(--blue) 9%,transparent);}
+.cc{color:var(--blue);font-weight:500;}
+.pos{color:var(--green);font-weight:500;}.neg{color:var(--red);font-weight:500;}.neu{color:var(--faint);}
+.r1{font-size:9px;padding:1px 4px;border-radius:3px;background:color-mix(in srgb,var(--green) 14%,transparent);color:var(--green);margin-left:4px;vertical-align:middle;}
+.rl{font-size:9px;padding:1px 4px;border-radius:3px;background:color-mix(in srgb,var(--red) 14%,transparent);color:var(--red);margin-left:4px;vertical-align:middle;}
+.na{color:var(--faint);font-size:11px;}
+
+/* CHART */
+.chart-wrap{display:none;background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:18px;margin-top:8px;}
+.chart-wrap.visible{display:block;}
+.chart-head{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:14px;}
+.chart-name{font-size:13px;font-weight:500;}
+.chart-cat{font-size:11px;font-family:var(--mono);color:var(--muted);margin-top:2px;}
+.chart-ctrl{display:flex;flex-direction:column;gap:7px;align-items:flex-end;}
+.cbtns{display:flex;gap:5px;}
+.cpill{font-family:var(--mono);font-size:11px;padding:3px 9px;border:1px solid var(--border);border-radius:20px;background:var(--bg);color:var(--muted);cursor:pointer;transition:all .12s;}
+.cpill:hover,.cpill.on{border-color:var(--blue);color:var(--blue);background:color-mix(in srgb,var(--blue) 8%,transparent);}
+.crange{display:flex;gap:5px;align-items:center;}
+.crange input{font-family:var(--mono);font-size:11px;padding:3px 7px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);color:var(--text);outline:none;width:112px;}
+.crange input:focus{border-color:var(--blue);}
+.crange span{font-size:11px;color:var(--faint);}
+.capply{font-family:var(--mono);font-size:11px;padding:3px 9px;border:1px solid var(--blue);border-radius:var(--r);background:transparent;color:var(--blue);cursor:pointer;}
+.capply:hover{background:color-mix(in srgb,var(--blue) 8%,transparent);}
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;}
+.leg{display:flex;align-items:center;gap:5px;font-size:11px;font-family:var(--mono);color:var(--muted);}
+.leg.hi{color:var(--text);font-weight:500;}
+.leg-line{width:18px;height:2.5px;border-radius:1px;flex-shrink:0;}
+.chart-box{position:relative;height:280px;}
+.chart-hint{font-family:var(--mono);font-size:12px;color:var(--faint);text-align:center;padding:50px 0;}
+.empty{text-align:center;padding:50px 20px;color:var(--muted);font-family:var(--mono);font-size:13px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div>
+    <h1>Fondos Mutuos · Retorno vs Peers</h1>
+    <div class="sub">Credicorp Capital · Renta Fija · Fuente: SMV</div>
+  </div>
+  <div class="sub" id="kv-info">—</div>
+</header>
+
+<div class="controls">
+  <div class="ctrl"><label>Fecha de corte</label><input type="date" id="d1"></div>
+  <button class="btn" id="btnCalc" onclick="calcular()">Calcular</button>
+</div>
+
+<div class="pills">
+  <span>Ver al cierre de:</span>
+  <button class="pill" onclick="setFin('hoy')">Hoy</button>
+  <button class="pill" onclick="setFin('vier')">Último viernes</button>
+</div>
+
+<div class="status" id="status"></div>
+<div id="content"><div class="empty">Selecciona una fecha de corte y presiona Calcular.</div></div>
+
+<!-- CHART -->
+<div class="chart-wrap" id="chart-wrap">
+  <div class="chart-head">
+    <div>
+      <div class="chart-name" id="chart-name">—</div>
+      <div class="chart-cat" id="chart-cat"></div>
+    </div>
+    <div class="chart-ctrl">
+      <div class="cbtns">
+        <button class="cpill" onclick="chartRango(3,this)">3d</button>
+        <button class="cpill" onclick="chartRango(7,this)">7d</button>
+        <button class="cpill" onclick="chartRango(15,this)">15d</button>
+        <button class="cpill" onclick="chartRango(30,this)">30d</button>
+        <button class="cpill on" onclick="chartRango('ytd',this)">YTD</button>
+      </div>
+      <div class="crange">
+        <input type="date" id="c0">
+        <span>→</span>
+        <input type="date" id="c1">
+        <button class="capply" onclick="chartRangoCustom()">Aplicar</button>
+      </div>
+    </div>
+  </div>
+  <div class="legend" id="chart-legend"></div>
+  <div class="chart-box">
+    <div class="chart-hint" id="chart-hint">← Haz clic en un fondo de la tabla</div>
+    <canvas id="ts-canvas" role="img" aria-label="Evolución en bps vs peers" style="display:none"></canvas>
+  </div>
+</div>
+
+</div>
+<script>
+const WORKER = "https://retorno-ffmm.carloconstantini1.workers.dev";
+
+const CATS = {
+  "Corto Plazo Soles":["CRED. CONSER. CORTO PLAZO S/ CREDICORP SAF","BBVA RENTA CORTO PLAZO S/. BBVA SAF","FONDOS SURA SAF-SURA CORTO PLAZO SOLES  SERIE B","INTERFONDO-IF OPORTUNIDAD SOLES  SERIE A","SF Corto Plazo Plus S/ SCOTIA FONDOS"],
+  "Mediano Plazo Soles":["CC CONSERV. MED. PLAZO S/. CREDICORP SAF","BBVA RENTA MED. PLAZO S/. BBVA SAF","FONDOS SURA SAF-SURA RENTA SOLES  SERIE B","IF MEDIANO PLAZO SOLES INTERFONDO","SF MEDIANO PLAZO FLEX S/ SCOTIA FONDOS"],
+  "Corto Plazo Dólares":["BBVA RENTA CORTO PLAZO $ BBVA SAF","CRED. CONSER. CORTO PLAZO $ CREDICORP SAF","FONDOS SURA SAF-SURA CORTO PLAZO DOLARES  SERIE B","INTERFONDO-IF OPORTUNIDAD  SERIE A","SF Corto Plazo Plus $ SCOTIA FONDOS"],
+  "Mediano Plazo Dólares":["BBVA RENTA MED. PLAZO $ BBVA SAF","CREDICORP CONSER. MED. PLA. $ CREDICORP SAF","IF MEDIANO PLAZO INTERFONDO","FONDOS SURA SAF-FdF SURA RENTA DOLARES  SERIE B","SF MEDIANO PLAZO FLEX $ SCOTIA FONDOS"],
+  "Liquidez Soles":["CRED. CONSERVAD. LIQUIDEZ S/ CREDICORP SAF","BBVA CASH SOLES BBVA SAF","FONDOS SURA SAF-SURA ULTRA CASH SOLES  SERIE B","SF Liquidez S/. SCOTIA FONDOS","INTERFONDO-IF LIBRE DISPONIBILIDAD S/.  SERIE A"],
+  "Liquidez Dólares":["CRED. CONSERVADOR LIQUIDEZ $ CREDICORP SAF","BBVA CASH DOLARES BBVA SAF","FONDOS SURA SAF-SURA ULTRA CASH DOLARES  SERIE B","SF LIQUIDEZ $ SCOTIA FONDOS","INTERFONDO-IF LIBRE DISPONIBILIDAD  SERIE A"],
+  "Deuda Corp Soles":["CC DEUDA CORPORATIVA SOLES CREDICORP SAF","SURA DEUDA SOBER. DISTRIB. S/ FONDOS SURA SAF"]
+};
+
+const COM_BASE = {
+  "CRED. CONSER. CORTO PLAZO S/ CREDICORP SAF":103.3,"BBVA RENTA CORTO PLAZO S/. BBVA SAF":70.8,"INTERFONDO-IF OPORTUNIDAD SOLES  SERIE A":129,"SF Corto Plazo Plus S/ SCOTIA FONDOS":106,"FONDOS SURA SAF-SURA CORTO PLAZO SOLES  SERIE B":82.60,"CRED. CONSER. CORTO PLAZO $ CREDICORP SAF":64.9,"BBVA RENTA CORTO PLAZO $ BBVA SAF":70.8,"INTERFONDO-IF OPORTUNIDAD  SERIE A":100.30,"FONDOS SURA SAF-SURA CORTO PLAZO DOLARES  SERIE B":82.60,"SF Corto Plazo Plus $ SCOTIA FONDOS":106.20,"CRED. CONSERVAD. LIQUIDEZ S/ CREDICORP SAF":67.19,"BBVA CASH SOLES BBVA SAF":59.0,"FONDOS SURA SAF-SURA ULTRA CASH SOLES  SERIE B":47.2,"SF Liquidez S/. SCOTIA FONDOS":85.03,"CRED. CONSERVADOR LIQUIDEZ $ CREDICORP SAF":74.27,"BBVA CASH DOLARES BBVA SAF":53.1,"FONDOS SURA SAF-SURA ULTRA CASH DOLARES  SERIE B":47.2,"SF LIQUIDEZ $ SCOTIA FONDOS":90.93,"CC CONSERV. MED. PLAZO S/. CREDICORP SAF":159.3,"BBVA RENTA MED. PLAZO S/. BBVA SAF":88.50,"IF MEDIANO PLAZO SOLES INTERFONDO":159.3,"FONDOS SURA SAF-SURA RENTA SOLES  SERIE B":135.7,"SF MEDIANO PLAZO FLEX S/ SCOTIA FONDOS":118,"CREDICORP CONSER. MED. PLA. $ CREDICORP SAF":159.3,"BBVA RENTA MED. PLAZO $ BBVA SAF":76.7,"FONDOS SURA SAF-FdF SURA RENTA DOLARES  SERIE B":100.3,"IF MEDIANO PLAZO INTERFONDO":159.3,"SF MEDIANO PLAZO FLEX $ SCOTIA FONDOS":118,"CC DEUDA CORPORATIVA SOLES CREDICORP SAF":99.9,"INTERFONDO-IF LIBRE DISPONIBILIDAD S/.  SERIE A":100.3,"INTERFONDO-IF LIBRE DISPONIBILIDAD  SERIE A":73.16,"SURA DEUDA SOBER. DISTRIB. S/ FONDOS SURA SAF":100
+};
+const COM_CAMBIOS = [
+  ["BBVA CASH DOLARES BBVA SAF","2025-02-15",59.0],["BBVA CASH DOLARES BBVA SAF","2025-11-01",63.7],
+  ["BBVA CASH SOLES BBVA SAF","2025-02-15",70.8],["BBVA CASH SOLES BBVA SAF","2025-11-01",76.7],
+  ["BBVA RENTA CORTO PLAZO $ BBVA SAF","2025-02-15",70.8],["BBVA RENTA CORTO PLAZO $ BBVA SAF","2025-11-01",82.6],
+  ["BBVA RENTA CORTO PLAZO S/. BBVA SAF","2025-02-15",82.6],["BBVA RENTA CORTO PLAZO S/. BBVA SAF","2025-11-01",94.4],
+  ["BBVA RENTA MED. PLAZO $ BBVA SAF","2025-02-15",88.5],["BBVA RENTA MED. PLAZO $ BBVA SAF","2025-11-01",106.2],
+  ["BBVA RENTA MED. PLAZO S/. BBVA SAF","2025-02-15",94.4],["BBVA RENTA MED. PLAZO S/. BBVA SAF","2025-11-01",118.0],
+  ["CRED. CONSER. CORTO PLAZO S/ CREDICORP SAF","2025-03-04",116.9],["CRED. CONSER. CORTO PLAZO S/ CREDICORP SAF","2025-07-15",127.5],
+  ["CRED. CONSER. CORTO PLAZO $ CREDICORP SAF","2025-03-04",79.1],["CRED. CONSER. CORTO PLAZO $ CREDICORP SAF","2025-07-15",89.7],
+  ["CREDICORP CONSER. MED. PLA. $ CREDICORP SAF","2025-03-04",165.2],["CC CONSERV. MED. PLAZO S/. CREDICORP SAF","2025-03-04",165.2],
+  ["CRED. CONSERVADOR LIQUIDEZ $ CREDICORP SAF","2025-07-15",71.91],["CRED. CONSERVAD. LIQUIDEZ S/ CREDICORP SAF","2025-07-15",114.39]
+];
+
+// Ventanas en días calendario (aproximado para días hábiles)
+const VENTANAS = {1:1,3:4,7:10,15:22,30:44};
+const VENTANA_YTD = 'ytd';
+
+let historico = {};
+let selFondo = null;
+let selCat = null;
+let chart = null;
+let currentChartIso0 = null;
+let currentChartIso1 = null;
+
+// ── Fecha helpers ─────────────────────────────────────────────────
+function hoyHabil() {
+  const d = new Date();
+  while(d.getDay()===0||d.getDay()===6) d.setDate(d.getDate()-1);
+  return d.toISOString().slice(0,10);
+}
+function isoRestar(isoFin, dias) {
+  const d = new Date(isoFin);
+  d.setDate(d.getDate()-dias);
+  return d.toISOString().slice(0,10);
+}
+function fechaMasCercana(iso) {
+  const keys = Object.keys(historico).sort();
+  if(!keys.length) return null;
+  // Buscar la fecha <= iso más cercana
+  let best = null;
+  for(const k of keys) { if(k<=iso) best=k; }
+  return best;
+}
+
+document.getElementById("d1").value = hoyHabil();
+
+function setFin(modo) {
+  if(modo==='hoy') document.getElementById("d1").value = hoyHabil();
+  else {
+    const d = new Date();
+    while(d.getDay()!==5) d.setDate(d.getDate()-1);
+    document.getElementById("d1").value = d.toISOString().slice(0,10);
+  }
+}
+
+// ── Comisiones ────────────────────────────────────────────────────
+function comVigente(fondo, fecha) {
+  let c = COM_BASE[fondo]||0;
+  COM_CAMBIOS.filter(x=>x[0]===fondo&&new Date(x[1])<=fecha)
+    .sort((a,b)=>new Date(a[1])-new Date(b[1])).forEach(x=>{c=x[2];});
+  return c;
+}
+function ajuste(fondo,ini,fin) {
+  const cortes=[new Date(ini)];
+  COM_CAMBIOS.filter(x=>x[0]===fondo).forEach(x=>{const d=new Date(x[1]);if(d>ini&&d<fin)cortes.push(d);});
+  cortes.push(new Date(fin));cortes.sort((a,b)=>a-b);
+  let bps=0;
+  for(let i=0;i<cortes.length-1;i++){const dias=(cortes[i+1]-cortes[i])/86400000;bps+=(comVigente(fondo,cortes[i])/360)*dias;}
+  return bps;
+}
+
+// ── KV / Fetch ────────────────────────────────────────────────────
+function toSMV(iso){const[y,m,d]=iso.split('-');return`${d}/${m}/${y}`;}
+
+async function getFecha(iso) {
+  if(historico[iso]&&Object.keys(historico[iso]).length>0) return historico[iso];
+  st(`<span class="spin"></span>Consultando SMV: ${iso}…`);
+  const res = await fetch(`${WORKER}/?fecha=${encodeURIComponent(toSMV(iso))}`);
+  const data = await res.json();
+  if(data.fondos&&Object.keys(data.fondos).length>0) historico[iso]=data.fondos;
+  return data.fondos||{};
+}
+
+async function cargarHistorico() {
+  try {
+    const res = await fetch(`${WORKER}/historico`);
+    const data = await res.json();
+    if(data.fechas) {
+      historico={...historico,...data.fechas};
+      const n=Object.keys(data.fechas).length;
+      document.getElementById("kv-info").textContent=`${n} fechas en KV`;
+    }
+  } catch(e){}
+}
+
+// ── Cálculo retorno para una ventana ─────────────────────────────
+function retorno(fondo, vcFin, isoFin, isoIni) {
+  const vcIni = historico[isoIni]?.[fondo];
+  if(!vcIni||!vcFin) return null;
+  const neto = (vcFin/vcIni-1)*10000;
+  const bruto = neto + ajuste(fondo, new Date(isoIni), new Date(isoFin));
+  return {neto, bruto};
+}
+
+// ── Calcular principal ────────────────────────────────────────────
+async function calcular() {
+  const isoFin = document.getElementById("d1").value;
+  if(!isoFin){st("⚠ Selecciona una fecha.");return;}
+
+  document.getElementById("btnCalc").disabled=true;
+  document.getElementById("chart-wrap").classList.remove("visible");
+  selFondo=null; selCat=null;
+
+  // Cargar histórico del KV primero (para tener las fechas anteriores)
+  st(`<span class="spin"></span>Cargando histórico…`);
+  await cargarHistorico();
+
+  // Cargar fecha de corte
+  st(`<span class="spin"></span>Cargando ${isoFin}…`);
+  const vcFin = await getFecha(isoFin);
+
+  // Calcular fecha YTD (31 dic año anterior)
+  const anoFin = isoFin.slice(0,4);
+  const isoYTD = `${parseInt(anoFin)-1}-12-31`;
+  await getFecha(isoYTD);
+
+  // Para cada ventana, buscar la fecha más cercana disponible
+  const isoVentanas = {};
+  for(const [dias, calDias] of Object.entries(VENTANAS)) {
+    const target = isoRestar(isoFin, calDias);
+    isoVentanas[dias] = fechaMasCercana(target);
+  }
+  isoVentanas['ytd'] = fechaMasCercana(isoYTD);
+
+  // Construir filas
+  const rows = [];
+  for(const [cat,fondos] of Object.entries(CATS)) {
+    for(const f of fondos) {
+      const vcF = vcFin[f]||null;
+      const rets = {};
+      for(const v of ['1','3','7','15','30','ytd']) {
+        const isoIni = isoVentanas[v];
+        rets[v] = isoIni ? retorno(f, vcF, isoFin, isoIni) : null;
+      }
+      rows.push({cat,f,vcF,rets});
+    }
+  }
+
+  const fmtD = iso=>new Date(iso+'T12:00:00').toLocaleDateString('es-PE',{day:'2-digit',month:'short',year:'numeric'});
+  st(`Cierre al ${fmtD(isoFin)}`);
+  renderTablas(rows, isoFin);
+  document.getElementById("btnCalc").disabled=false;
+}
+
+// ── Render tablas ─────────────────────────────────────────────────
+function renderTablas(rows, isoFin) {
+  const cols = ['1','3','7','15','30','ytd'];
+  const colLabels = {'1':'1d','3':'3d','7':'7d','15':'15d','30':'30d','ytd':'YTD'};
+
+  function buildTable(tipo) {
+    // Calcular rankings por categoría y ventana
+    const rank = {};
+    for(const [cat,fondos] of Object.entries(CATS)) {
+      rank[cat]={};
+      for(const v of cols) {
+        const vals = rows.filter(r=>r.cat===cat&&r.rets[v]!==null)
+          .map(r=>({f:r.f,val:r.rets[v]?.[tipo]}))
+          .filter(x=>x.val!==null&&!isNaN(x.val))
+          .sort((a,b)=>b.val-a.val);
+        if(vals.length){rank[cat][v]={top:vals[0].f,bot:vals[vals.length-1].f};}
+      }
+    }
+
+    let html=`<div class="tcard"><div class="tscroll"><table>
+      <thead><tr>
+        <th class="l" style="width:300px">Fondo</th>
+        ${cols.map(v=>`<th>${colLabels[v]}</th>`).join('')}
+      </tr></thead><tbody>`;
+
+    let lastCat=null;
+    for(const r of rows) {
+      if(r.cat!==lastCat){
+        html+=`<tr><td class="cat" colspan="${cols.length+1}">${r.cat}</td></tr>`;
+        lastCat=r.cat;
+      }
+      const icc=/CREDICORP|^CC |^CRED\./i.test(r.f)?'cc':'';
+      const sel=selFondo===r.f?' sel':'';
+      html+=`<tr class="drow${sel}" onclick="selRow('${r.f.replace(/'/g,"\\'")}','${r.cat.replace(/'/g,"\\'")}')">`;
+      html+=`<td class="fname"><span class="${icc}">${r.f}</span></td>`;
+      for(const v of cols) {
+        const ret = r.rets[v];
+        const val = ret?.[tipo];
+        if(val===null||val===undefined||isNaN(val)){
+          html+=`<td class="na">—</td>`;
+        } else {
+          const cls=val>=0?'pos':'neg';
+          const sign=val>=0?'+':'';
+          const isTop=rank[r.cat][v]?.top===r.f;
+          const isBot=rank[r.cat][v]?.bot===r.f;
+          const badge=isTop?'<span class="r1">↑</span>':isBot?'<span class="rl">↓</span>':'';
+          html+=`<td class="${cls}">${sign}${val.toFixed(1)}${badge}</td>`;
+        }
+      }
+      html+=`</tr>`;
+    }
+    html+=`</tbody></table></div></div>`;
+    return html;
+  }
+
+  document.getElementById("content").innerHTML=`
+    <div class="perf-block">
+      <div class="block-title">Performance Bruta (bps)</div>
+      ${buildTable('bruto')}
+    </div>
+    <div class="perf-block">
+      <div class="block-title">Performance Neta (bps)</div>
+      ${buildTable('neto')}
+    </div>`;
+}
+
+// ── Seleccionar fondo → gráfico ───────────────────────────────────
+function selRow(fondo, cat) {
+  selFondo=fondo; selCat=cat;
+  document.querySelectorAll(".drow").forEach(tr=>{
+    const sp=tr.querySelector("span");
+    tr.classList.toggle("sel",sp&&sp.textContent.trim().startsWith(fondo));
+  });
+  document.getElementById("chart-wrap").classList.add("visible");
+  document.getElementById("chart-name").textContent=fondo;
+  document.getElementById("chart-cat").textContent=cat;
+  // Default YTD
+  const isoFin=document.getElementById("d1").value;
+  const isoIni=`${parseInt(isoFin.slice(0,4))-1}-12-31`;
+  document.getElementById("c0").value=isoIni;
+  document.getElementById("c1").value=isoFin;
+  currentChartIso0=isoIni; currentChartIso1=isoFin;
+  document.querySelectorAll(".cpill").forEach(b=>b.classList.remove("on"));
+  document.querySelector(".cpill:last-child").classList.add("on");
+  dibujarChart(isoIni,isoFin);
+  document.getElementById("chart-wrap").scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+function chartRango(n,btn) {
+  const isoFin=document.getElementById("d1").value;
+  let isoIni;
+  if(n==='ytd') isoIni=`${parseInt(isoFin.slice(0,4))-1}-12-31`;
+  else isoIni=isoRestar(isoFin,n==='15'?22:n==='30'?44:n*1.4|0);
+  document.getElementById("c0").value=isoIni;
+  document.getElementById("c1").value=isoFin;
+  document.querySelectorAll(".cpill").forEach(b=>b.classList.remove("on"));
+  if(btn) btn.classList.add("on");
+  dibujarChart(isoIni,isoFin);
+}
+
+function chartRangoCustom() {
+  const i=document.getElementById("c0").value;
+  const f=document.getElementById("c1").value;
+  if(!i||!f||i>=f) return;
+  document.querySelectorAll(".cpill").forEach(b=>b.classList.remove("on"));
+  dibujarChart(i,f);
+}
+
+function dibujarChart(isoIni,isoFin) {
+  if(!selFondo||!selCat) return;
+  currentChartIso0=isoIni; currentChartIso1=isoFin;
+
+  const fechas=Object.keys(historico).filter(d=>d>=isoIni&&d<=isoFin).sort();
+  if(fechas.length<2){
+    document.getElementById("chart-hint").style.display="block";
+    document.getElementById("chart-hint").textContent="Sin suficiente histórico en KV para este período. Consulta más fechas primero.";
+    document.getElementById("ts-canvas").style.display="none";
+    return;
+  }
+
+  const peers=CATS[selCat]||[];
+  const dark=matchMedia("(prefers-color-scheme:dark)").matches;
+
+  // Colores: azul para Credicorp/seleccionado, grises para peers
+  const PEER_COLORS=["#a0a09a","#b8b5ac","#888880","#c8c5bc","#d0cdc4"];
+  const datasets=[];
+
+  peers.forEach((f,i)=>{
+    const isSel=f===selFondo;
+    const isCC=/CREDICORP|^CC |^CRED\./i.test(f);
+    const color=isSel?(isCC?"#185FA5":"#e07b20"):PEER_COLORS[i%PEER_COLORS.length];
+    const labels=[], vals=[];
+    const vcBase=historico[fechas[0]]?.[f];
+    if(!vcBase) return;
+    for(const d of fechas){
+      const vc=historico[d]?.[f];
+      if(vc){labels.push(d.slice(5));vals.push(+((vc/vcBase-1)*10000).toFixed(2));}
+    }
+    datasets.push({
+      label:f, data:vals, labels,
+      borderColor:color,
+      backgroundColor:"transparent",
+      borderWidth:isSel?2.5:1.2,
+      borderDash:isSel?[]:[4,3],
+      pointRadius:0, tension:0.3,
+      order:isSel?0:1,
+    });
+  });
+
+  // Usar las labels del fondo seleccionado (o el primero disponible)
+  const mainLabels=datasets.find(d=>d.label===selFondo)?.labels||datasets[0]?.labels||[];
+
+  document.getElementById("chart-hint").style.display="none";
+  const canvas=document.getElementById("ts-canvas");
+  canvas.style.display="block";
+
+  if(chart){chart.destroy();chart=null;}
+  const gridC=dark?"#2e2d28":"#e2dfd6";
+  const tickC=dark?"#4a4944":"#b8b5ac";
+
+  chart=new Chart(canvas,{
+    type:"line",
+    data:{labels:mainLabels,datasets:datasets.map(d=>({...d,data:d.data}))},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      interaction:{mode:"index",intersect:false},
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          callbacks:{
+            label:ctx=>{
+              const v=+ctx.raw;
+              return` ${ctx.dataset.label.split(" ").slice(-2).join(" ")}: ${v>=0?"+":""}${v.toFixed(1)} bps`;
+            }
+          }
+        }
+      },
+      scales:{
+        x:{ticks:{color:tickC,font:{family:"'IBM Plex Mono'",size:10},maxTicksLimit:8,autoSkip:true},grid:{color:gridC}},
+        y:{ticks:{color:tickC,font:{family:"'IBM Plex Mono'",size:10},callback:v=>(v>=0?"+":"")+v.toFixed(0)+" bps"},grid:{color:gridC}}
+      }
+    }
+  });
+
+  // Legend
+  const legEl=document.getElementById("chart-legend");
+  legEl.innerHTML=datasets.map(d=>{
+    const isSel=d.label===selFondo;
+    const isCC=/CREDICORP|^CC |^CRED\./i.test(d.label);
+    const nombre=d.label.replace(/FONDOS SURA SAF-/g,"").replace(/ SERIE B$/,"").replace(/ CREDICORP SAF$/,"").replace(/ BBVA SAF$/,"").replace(/ FONDOS SURA SAF$/,"").replace(/ INTERFONDO$/,"").replace(/ SCOTIA FONDOS$/,"").trim();
+    return`<div class="leg${isSel?" hi":""}"><div class="leg-line" style="background:${d.borderColor};${!isSel?"opacity:.6":""}"></div>${nombre}</div>`;
+  }).join("");
+}
+
+function st(msg){document.getElementById("status").innerHTML=msg;}
+
+// Init
+cargarHistorico();
+</script>
+</body>
+</html>
