@@ -258,6 +258,8 @@ async function calcular(){
 
   st(`<span class="spin"></span>Cargando ${isoFin}…`);
   let vcFin=await getFecha(isoFin, true);
+  // Si force scraping no trajo datos, usar lo que hay en KV
+  if(!vcFin||Object.keys(vcFin).length===0) vcFin=historico[isoFin]||{};
   if(!vcFin||Object.keys(vcFin).length===0){
     const ultima=fechaMasCercana(isoFin);
     if(ultima&&ultima!==isoFin){
