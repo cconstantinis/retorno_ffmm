@@ -14,8 +14,6 @@
   --cat-bg:#1a2e45;--cat-text:#a8c8e8;
   --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;--r:6px;
 }
-
-}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:14px;}
 .wrap{max-width:1100px;margin:0 auto;padding:0 20px 60px;}
@@ -93,6 +91,15 @@ tr:last-child td{border-bottom:none;}
 .leg.hi{color:var(--text);font-weight:500;}
 .leg-line{width:16px;height:2px;border-radius:1px;flex-shrink:0;}
 .chart-box{position:relative;height:240px;}
+/* TABS */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:18px;}
+.tab{font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;padding:8px 18px;border:none;border-bottom:2px solid transparent;background:none;color:var(--muted);cursor:pointer;margin-bottom:-1px;}
+.tab:hover{color:var(--blue);}
+.tab.on{color:var(--blue);border-bottom-color:var(--blue);}
+.tabpane{display:none;}.tabpane.on{display:block;}
+tr.tot-row td{background:var(--bg);font-weight:500;border-top:1px solid var(--border);}
+td.share{color:var(--muted);}
+.unit{font-size:9px;opacity:.7;margin-left:6px;letter-spacing:.04em;}
 </style>
 </head>
 <body>
@@ -100,11 +107,16 @@ tr:last-child td{border-bottom:none;}
 
 <header>
   <div>
-    <h1>Fondos Mutuos · Retorno vs Peers</h1>
+    <h1>Fondos Mutuos · Retorno y AUM vs Peers</h1>
     <div class="sub">Credicorp Capital · Renta Fija · Fuente: SMV</div>
   </div>
   <div class="sub" id="kv-info">—</div>
 </header>
+
+<div class="tabs">
+  <button class="tab on" id="tabbtn-ret" onclick="verTab('ret')">Retornos</button>
+  <button class="tab" id="tabbtn-aum" onclick="verTab('aum')">AUM</button>
+</div>
 
 <div class="controls">
   <div class="ctrl"><label>Fecha de corte</label><input type="date" id="d1"></div>
@@ -117,6 +129,7 @@ tr:last-child td{border-bottom:none;}
 </div>
 <div class="status" id="status"></div>
 
+<div class="tabpane on" id="tab-ret">
 <div id="content"><div class="empty">Selecciona una fecha de corte y presiona Calcular.</div></div>
 
 <!-- CHART SECTION -->
@@ -157,6 +170,49 @@ tr:last-child td{border-bottom:none;}
     </div>
   </div>
 </div>
+</div><!-- /tab-ret -->
+
+<div class="tabpane" id="tab-aum">
+<div id="content-aum"><div class="empty">Selecciona una fecha de corte y presiona Calcular.</div></div>
+
+<div class="chart-section" id="chart-section-aum">
+  <div class="chart-section-title">Evolución de AUM vs peers</div>
+  <div class="chart-toolbar">
+    <div class="ctrl">
+      <label>Categoría</label>
+      <select id="cat-select" onchange="dibujarChartsAUM()"></select>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:7px;">
+      <div class="cbtns" id="aum-pills">
+        <button class="cpill" onclick="chartRangoAUM(1,this)">1d</button>
+        <button class="cpill" onclick="chartRangoAUM(3,this)">3d</button>
+        <button class="cpill" onclick="chartRangoAUM(7,this)">7d</button>
+        <button class="cpill" onclick="chartRangoAUM(15,this)">15d</button>
+        <button class="cpill" onclick="chartRangoAUM(30,this)">30d</button>
+        <button class="cpill on" onclick="chartRangoAUM('ytd',this)">YTD</button>
+      </div>
+      <div class="crange">
+        <input type="date" id="a0">
+        <span>→</span>
+        <input type="date" id="a1">
+        <button class="capply" onclick="chartRangoCustomAUM()">Aplicar</button>
+      </div>
+    </div>
+  </div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-card-title" id="aum-chart-title">AUM (MM)</div>
+      <div class="legend" id="legend-aum"></div>
+      <div class="chart-box"><canvas id="chart-aum" role="img" aria-label="AUM por fondo"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">Participación de mercado (%)</div>
+      <div class="legend" id="legend-share"></div>
+      <div class="chart-box"><canvas id="chart-share" role="img" aria-label="Participación de mercado"></canvas></div>
+    </div>
+  </div>
+</div>
+</div><!-- /tab-aum -->
 
 </div>
 <script>
@@ -194,7 +250,20 @@ const COM_CAMBIOS = [
   ["CRED. CONSERVAD. LIQUIDEZ S/ CREDICORP SAF","2026-09-21",90.86],["CRED. CONSERVADOR LIQUIDEZ $ CREDICORP SAF","2026-09-21",63.72]
 ];
 
+// Colores fijos por SAF
+const SAF_COLOR={credicorp:"#e07b20",bbva:"#003366",sura:"#2a2a2a",interfondo:"#2a7a2a",scotia:"#c0392b"};
+function safColor(n){
+  if(/CREDICORP|^CC |^CRED\./i.test(n))return SAF_COLOR.credicorp;
+  if(/BBVA/i.test(n))return SAF_COLOR.bbva;
+  if(/SURA/i.test(n))return SAF_COLOR.sura;
+  if(/INTERFONDO|^IF /i.test(n))return SAF_COLOR.interfondo;
+  if(/SCOTIA|^SF /i.test(n))return SAF_COLOR.scotia;
+  return "#888880";
+}
+
 let historico = {};
+let aumIdx = {};
+let isoVentanasG = {};
 let chartBruto = null, chartNeto = null;
 let currentIsoFin = null;
 
@@ -232,6 +301,7 @@ async function getFecha(iso, force=false){
   const res=await fetch(url);
   const data=await res.json();
   if(data.fondos&&Object.keys(data.fondos).length>0)historico[iso]=data.fondos;
+  if(data.aum&&Object.keys(data.aum).length>0)aumIdx[iso]={...(aumIdx[iso]||{}),...data.aum};
   return data.fondos||{};
 }
 
@@ -240,6 +310,11 @@ async function cargarHistorico(){
     const res=await fetch(`${WORKER}/historico`);
     const data=await res.json();
     if(data.fechas){historico={...historico,...data.fechas};const n=Object.keys(data.fechas).length;document.getElementById("kv-info").textContent=`${n} fechas en KV`;}
+  }catch(e){}
+  try{
+    const r2=await fetch(`${WORKER}/aum`);
+    const d2=await r2.json();
+    if(d2.fechas){for(const[k,v] of Object.entries(d2.fechas))aumIdx[k]={...v,...(aumIdx[k]||{})};}
   }catch(e){}
 }
 
@@ -287,6 +362,7 @@ async function calcular(){
     isoVentanas[key]=idx>=0?fechasDisp[idx]:null;
   }
   isoVentanas['ytd']=fechaMasCercana(isoYTD);
+  isoVentanasG={...isoVentanas,ytd:isoYTD};
 
   const rows=[];
   for(const[cat,fondos] of Object.entries(CATS)){
@@ -309,6 +385,7 @@ async function calcular(){
   // Default YTD en chart
   document.getElementById("c0").value=isoYTD;
   document.getElementById("c1").value=currentIsoFin;
+  renderAUM();
   document.getElementById("btnCalc").disabled=false;
 }
 
@@ -420,22 +497,6 @@ function dibujarCharts(){
   if(fechas.length<2)return;
 
   const dark=false; // siempre tema claro
-  // Colores fijos por SAF
-const SAF_COLOR = {
-  credicorp: "#e07b20",  // naranja
-  bbva:      "#003366",  // azul marino
-  sura:      "#2a2a2a",  // negro
-  interfondo:"#2a7a2a",  // verde
-  scotia:    "#c0392b",  // rojo
-};
-function safColor(nombre) {
-  if(/CREDICORP|^CC |^CRED\./i.test(nombre)) return SAF_COLOR.credicorp;
-  if(/BBVA/i.test(nombre)) return SAF_COLOR.bbva;
-  if(/SURA/i.test(nombre)) return SAF_COLOR.sura;
-  if(/INTERFONDO|^IF /i.test(nombre)) return SAF_COLOR.interfondo;
-  if(/SCOTIA|^SF /i.test(nombre)) return SAF_COLOR.scotia;
-  return "#888880";
-}
   const gridC=dark?"#2e2d28":"#e2dfd6";
   const tickC=dark?"#4a4944":"#b8b5ac";
 
@@ -500,6 +561,183 @@ function safColor(nombre) {
 function shortName(f){
   if(/CREDICORP SAF|CREDICORP SAF/.test(f))return f.replace(/ CREDICORP SAF$/,"").replace(/FONDOS SURA SAF-/,"").trim();
   return f.replace(/ BBVA SAF$/,"").replace(/ FONDOS SURA SAF$/,"").replace(/FONDOS SURA SAF-/,"").replace(/ INTERFONDO$/,"").replace(/ SCOTIA FONDOS$/,"").replace(/ SERIE B$/,"").trim();
+}
+
+
+/* ======================= AUM ======================= */
+function verTab(t){
+  for(const x of ['ret','aum']){
+    document.getElementById('tab-'+x).classList.toggle('on',x===t);
+    document.getElementById('tabbtn-'+x).classList.toggle('on',x===t);
+  }
+  if(t==='aum'&&currentIsoFin)dibujarChartsAUM();
+}
+const esUSD=cat=>/Dólares/.test(cat);
+const catDe=f=>Object.keys(CATS).find(c=>CATS[c].includes(f));
+
+// Tipo de cambio vigente (último publicado ≤ iso)
+function tcAt(iso){
+  const ks=Object.keys(aumIdx).filter(k=>k<=iso&&aumIdx[k]._TC).sort();
+  return ks.length?aumIdx[ks[ks.length-1]]._TC:null;
+}
+// AUM de un fondo en MM de la moneda de su categoría (arrastra hasta 7 días)
+function aumAt(f,iso){
+  if(!iso)return null;
+  const lim=isoRestar(iso,7);
+  const ks=Object.keys(aumIdx).filter(k=>k<=iso&&k>=lim&&aumIdx[k][f]>0).sort();
+  if(!ks.length)return null;
+  const k=ks[ks.length-1];
+  let v=aumIdx[k][f];
+  if(esUSD(catDe(f))){const tc=aumIdx[k]._TC||tcAt(k);if(!tc)return null;v=v/tc;}
+  return v/1e6;
+}
+const fmtMM=v=>v.toLocaleString('es-PE',{minimumFractionDigits:1,maximumFractionDigits:1});
+
+function renderAUM(){
+  const cont=document.getElementById("content-aum");
+  if(!Object.keys(aumIdx).length){
+    cont.innerHTML=`<div class="empty">Aún no hay patrimonio en KV. Se llenará con el worker nuevo.</div>`;
+    return;
+  }
+  const cols=['1','3','7','15','30','ytd'];
+  const colLabels={'1':'1d','3':'3d','7':'7d','15':'15d','30':'30d','ytd':'YTD'};
+  const iso=currentIsoFin;
+
+  // Datos por fondo
+  const data={};
+  for(const[cat,fondos] of Object.entries(CATS)){
+    for(const f of fondos){
+      const fin=aumAt(f,iso);
+      const d={fin,delta:{},pct:{}};
+      for(const v of cols){
+        const ini=aumAt(f,isoVentanasG[v]);
+        d.delta[v]=(fin!=null&&ini!=null)?fin-ini:null;
+        d.pct[v]=(fin!=null&&ini)?(fin/ini-1)*100:null;
+      }
+      data[f]=d;
+    }
+  }
+
+  function tabla(tipo){ // 'delta' | 'pct'
+    const unidad=tipo==='delta'?'Δ MM':'Δ %';
+    let h=`<div class="tcard"><div class="tscroll"><table><thead><tr>
+      <th class="l" style="min-width:280px">Fondo</th><th>AUM MM</th><th>Part.</th>
+      ${cols.map(v=>`<th>${colLabels[v]}</th>`).join('')}</tr></thead><tbody>`;
+    for(const[cat,fondos] of Object.entries(CATS)){
+      const mon=esUSD(cat)?'US$':'S/';
+      const tot=fondos.reduce((a,f)=>a+(data[f].fin||0),0);
+      // ranking
+      const rk={};
+      for(const v of cols){
+        const vs=fondos.map(f=>({f,x:data[f][tipo][v]})).filter(o=>o.x!=null).sort((a,b)=>b.x-a.x);
+        if(vs.length>1)rk[v]={top:vs[0].f,bot:vs[vs.length-1].f};
+      }
+      h+=`<tr class="cat-row"><td colspan="${cols.length+3}"><span class="cat-label">CATEGORÍA</span>${cat}<span class="unit">${mon} MM · ${unidad}</span></td></tr>`;
+      for(const f of fondos){
+        const d=data[f];
+        const icc=/CREDICORP|^CC |^CRED\./i.test(f)?'cc':'';
+        h+=`<tr class="drow" onclick="selectCatAUM('${cat}')"><td class="fname"><span class="${icc}">${f}</span></td>`;
+        h+=d.fin!=null?`<td>${fmtMM(d.fin)}</td><td class="share">${tot?(d.fin/tot*100).toFixed(1)+'%':'—'}</td>`:`<td class="na">—</td><td class="na">—</td>`;
+        for(const v of cols){
+          const x=d[tipo][v];
+          if(x==null||isNaN(x)){h+=`<td class="na">—</td>`;continue;}
+          const cls=Math.abs(x)<0.05?'neu':x>0?'pos':'neg';
+          const badge=rk[v]?.top===f?`<span class="r1">↑</span>`:rk[v]?.bot===f?`<span class="rl">↓</span>`:'';
+          h+=`<td class="${cls}">${x>=0?'+':''}${tipo==='delta'?fmtMM(x):x.toFixed(1)+'%'}${badge}</td>`;
+        }
+        h+=`</tr>`;
+      }
+      // total categoría
+      h+=`<tr class="tot-row"><td class="fname">Total categoría</td><td>${fmtMM(tot)}</td><td class="share">100%</td>`;
+      for(const v of cols){
+        const ds=fondos.map(f=>data[f].delta[v]);
+        if(ds.some(x=>x==null)){h+=`<td class="na">—</td>`;continue;}
+        const dt=ds.reduce((a,b)=>a+b,0);
+        const x=tipo==='delta'?dt:(tot-dt?dt/(tot-dt)*100:null);
+        if(x==null){h+=`<td class="na">—</td>`;continue;}
+        const cls=Math.abs(x)<0.05?'neu':x>0?'pos':'neg';
+        h+=`<td class="${cls}">${x>=0?'+':''}${tipo==='delta'?fmtMM(x):x.toFixed(1)+'%'}</td>`;
+      }
+      h+=`</tr>`;
+    }
+    return h+`</tbody></table></div></div>`;
+  }
+
+  const tc=tcAt(iso);
+  cont.innerHTML=`
+    <div class="status" style="margin-bottom:8px">Patrimonio SMV · Dólares convertidos al TC de cada día${tc?` (TC ${iso}: ${tc.toFixed(3)})`:''}</div>
+    <div class="perf-block"><div class="block-title">AUM y variación (millones)</div>${tabla('delta')}</div>
+    <div class="perf-block"><div class="block-title">Variación de AUM (%)</div>${tabla('pct')}</div>`;
+
+  // selector de categoría
+  const sel=document.getElementById("cat-select");
+  const prev=sel.value;
+  sel.innerHTML=Object.keys(CATS).map(c=>`<option value="${c}">${c}</option>`).join('');
+  sel.value=prev&&CATS[prev]?prev:Object.keys(CATS)[0];
+  document.getElementById("a0").value=isoVentanasG.ytd;
+  document.getElementById("a1").value=iso;
+  document.querySelectorAll("#aum-pills .cpill").forEach(b=>b.classList.toggle("on",b.textContent==='YTD'));
+  document.getElementById("chart-section-aum").classList.add("visible");
+  if(document.getElementById('tab-aum').classList.contains('on'))dibujarChartsAUM();
+}
+
+function selectCatAUM(cat){
+  document.getElementById("cat-select").value=cat;
+  document.getElementById("chart-section-aum").scrollIntoView({behavior:"smooth",block:"start"});
+  dibujarChartsAUM();
+}
+function chartRangoAUM(n,btn){
+  const isoFin=currentIsoFin;
+  if(!isoFin)return;
+  const isoIni=n==='ytd'?isoVentanasG.ytd:(isoVentanasG[String(n)]||isoRestar(isoFin,n));
+  document.getElementById("a0").value=isoIni;
+  document.getElementById("a1").value=isoFin;
+  document.querySelectorAll("#aum-pills .cpill").forEach(b=>b.classList.remove("on"));
+  if(btn)btn.classList.add("on");
+  dibujarChartsAUM();
+}
+function chartRangoCustomAUM(){
+  const i=document.getElementById("a0").value,f=document.getElementById("a1").value;
+  if(!i||!f||i>=f)return;
+  document.querySelectorAll("#aum-pills .cpill").forEach(b=>b.classList.remove("on"));
+  dibujarChartsAUM();
+}
+
+function dibujarChartsAUM(){
+  const cat=document.getElementById("cat-select").value;
+  const isoIni=document.getElementById("a0").value, isoFin=document.getElementById("a1").value;
+  if(!cat||!isoIni||!isoFin)return;
+  const fondos=CATS[cat];
+  const mon=esUSD(cat)?'US$':'S/';
+  document.getElementById("aum-chart-title").textContent=`AUM (${mon} MM)`;
+  const fechas=Object.keys(aumIdx).filter(d=>d>=isoIni&&d<=isoFin).sort();
+  const serie={};
+  for(const f of fondos)serie[f]=fechas.map(d=>aumAt(f,d));
+  const tot=fechas.map((d,i)=>fondos.every(f=>serie[f][i]!=null)?fondos.reduce((a,f)=>a+serie[f][i],0):null);
+  const gridC="#e2dfd6",tickC="#b8b5ac";
+
+  function draw(canvasId,legendId,valores,fmtY,fmtTip){
+    const canvas=document.getElementById(canvasId);
+    const ex=Chart.getChart(canvas);if(ex)ex.destroy();
+    const ds=fondos.map(f=>{
+      const cc=/CREDICORP|^CC |^CRED\./i.test(f);
+      return{label:f,data:valores(f),borderColor:safColor(f),backgroundColor:"transparent",
+        borderWidth:cc?2.5:1.3,borderDash:cc?[]:[4,3],pointRadius:fechas.length<3?3:0,tension:0.25,spanGaps:true,order:cc?0:1};
+    });
+    new Chart(canvas,{type:"line",data:{labels:fechas.map(d=>d.slice(5)),datasets:ds},
+      options:{responsive:true,maintainAspectRatio:false,interaction:{mode:"index",intersect:false},
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw==null?null:` ${shortName(c.dataset.label)}: ${fmtTip(c.raw)}`}}},
+        scales:{x:{ticks:{color:tickC,font:{family:"'IBM Plex Mono'",size:10},maxTicksLimit:8,autoSkip:true},grid:{color:gridC}},
+                y:{ticks:{color:tickC,font:{family:"'IBM Plex Mono'",size:10},callback:fmtY},grid:{color:gridC}}}}});
+    document.getElementById(legendId).innerHTML=fondos.map(f=>{
+      const cc=/CREDICORP|^CC |^CRED\./i.test(f);
+      return`<div class="leg${cc?" hi":""}"><div class="leg-line" style="background:${safColor(f)}"></div>${shortName(f)}</div>`;
+    }).join("");
+  }
+  draw("chart-aum","legend-aum",f=>serie[f].map(v=>v==null?null:+v.toFixed(2)),
+       v=>v.toLocaleString('es-PE',{maximumFractionDigits:0}),v=>`${mon} ${fmtMM(+v)} MM`);
+  draw("chart-share","legend-share",f=>serie[f].map((v,i)=>v==null||!tot[i]?null:+(v/tot[i]*100).toFixed(2)),
+       v=>v.toFixed(0)+"%",v=>`${(+v).toFixed(1)}%`);
 }
 
 function st(msg){document.getElementById("status").innerHTML=msg;}
