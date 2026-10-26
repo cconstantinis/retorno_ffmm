@@ -147,6 +147,8 @@ td.share{color:var(--muted);}
         <button class="cpill" onclick="chartRango(7,this)">7d</button>
         <button class="cpill" onclick="chartRango(15,this)">15d</button>
         <button class="cpill" onclick="chartRango(30,this)">30d</button>
+        <button class="cpill" onclick="chartRango('mtd',this)">MTD</button>
+        <button class="cpill" onclick="chartRango('3m',this)">3M</button>
         <button class="cpill on" onclick="chartRango('ytd',this)">YTD</button>
       </div>
       <div class="crange">
@@ -189,6 +191,8 @@ td.share{color:var(--muted);}
         <button class="cpill" onclick="chartRangoAUM(7,this)">7d</button>
         <button class="cpill" onclick="chartRangoAUM(15,this)">15d</button>
         <button class="cpill" onclick="chartRangoAUM(30,this)">30d</button>
+        <button class="cpill" onclick="chartRangoAUM('mtd',this)">MTD</button>
+        <button class="cpill" onclick="chartRangoAUM('3m',this)">3M</button>
         <button class="cpill on" onclick="chartRangoAUM('ytd',this)">YTD</button>
       </div>
       <div class="crange">
@@ -362,6 +366,13 @@ async function calcular(){
     isoVentanas[key]=idx>=0?fechasDisp[idx]:null;
   }
   isoVentanas['ytd']=fechaMasCercana(isoYTD);
+  // MTD: cierre del mes anterior · 3M: misma fecha tres meses atrás
+  const [yF,mF,dF]=currentIsoFin.split('-').map(Number);
+  const isoMTD=new Date(Date.UTC(yF,mF-1,0)).toISOString().slice(0,10);
+  const ult3=new Date(Date.UTC(yF,mF-3,0)).getUTCDate();
+  const iso3M=new Date(Date.UTC(yF,mF-4,Math.min(dF,ult3))).toISOString().slice(0,10);
+  isoVentanas['mtd']=fechaMasCercana(isoMTD);
+  isoVentanas['3m']=fechaMasCercana(iso3M);
   isoVentanasG={...isoVentanas,ytd:isoYTD};
 
   const rows=[];
@@ -369,7 +380,7 @@ async function calcular(){
     for(const f of fondos){
       const vcF=vcFin[f]||null;
       const rets={};
-      for(const v of ['1','3','7','15','30','ytd']){
+      for(const v of ['1','3','7','15','30','mtd','3m','ytd']){
         const isoIni=isoVentanas[v];
         rets[v]=isoIni?retorno(f,vcF,currentIsoFin,isoIni):null;
       }
@@ -390,8 +401,8 @@ async function calcular(){
 }
 
 function renderTablas(rows){
-  const cols=['1','3','7','15','30','ytd'];
-  const colLabels={'1':'1d','3':'3d','7':'7d','15':'15d','30':'30d','ytd':'YTD'};
+  const cols=['1','3','7','15','30','mtd','3m','ytd'];
+  const colLabels={'1':'1d','3':'3d','7':'7d','15':'15d','30':'30d','mtd':'MTD','3m':'3M','ytd':'YTD'};
 
   function buildTable(tipo){
     const rank={};
@@ -461,6 +472,7 @@ function chartRango(n,btn){
   const isoFin=currentIsoFin||document.getElementById("d1").value;
   let isoIni;
   if(n==='ytd'){isoIni=`${parseInt(isoFin.slice(0,4))-1}-12-31`;}
+  else if(n==='mtd'||n==='3m'){isoIni=isoVentanasG[n];}
   else{
     const fechasDisp=Object.keys(historico).filter(d=>d<=isoFin).sort();
     const idx=fechasDisp.length-1-n;
@@ -599,8 +611,8 @@ function renderAUM(){
     cont.innerHTML=`<div class="empty">Aún no hay patrimonio en KV. Se llenará con el worker nuevo.</div>`;
     return;
   }
-  const cols=['1','3','7','15','30','ytd'];
-  const colLabels={'1':'1d','3':'3d','7':'7d','15':'15d','30':'30d','ytd':'YTD'};
+  const cols=['1','3','7','15','30','mtd','3m','ytd'];
+  const colLabels={'1':'1d','3':'3d','7':'7d','15':'15d','30':'30d','mtd':'MTD','3m':'3M','ytd':'YTD'};
   const iso=currentIsoFin;
 
   // Datos por fondo
